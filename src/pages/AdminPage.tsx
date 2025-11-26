@@ -28,9 +28,14 @@ export function AdminPage() {
   const [carregandoAgendados, setCarregandoAgendados] = useState(false);
   const [agendados, setAgendados] = useState<Agendamento[]>([]);
   const [erro, setErro] = useState<string | null>(null);
+  const [mensagem, setMensagem] = useState<string | null>(null);
 
   const [autorizado, setAutorizado] = useState(false);
   const [codigoDigitado, setCodigoDigitado] = useState("");
+
+  const [dataEditada, setDataEditada] = useState("");
+  const [capacidadeEditada, setCapacidadeEditada] = useState("");
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
 
   const CODIGO_ADMIN = "terreiro2025";
 
@@ -45,6 +50,7 @@ export function AdminPage() {
     const fetchGiras = async () => {
       setCarregandoGiras(true);
       setErro(null);
+      setMensagem(null);
 
       const { data, error } = await supabase
         .from("giras")
@@ -70,6 +76,22 @@ export function AdminPage() {
 
     fetchGiras();
   }, []);
+
+  const giraSelecionada = giras.find((g) => g.id === giraSelecionadaId) ?? null;
+
+  // sempre que trocar a gira selecionada, sincroniza os campos editáveis
+  useEffect(() => {
+    if (giraSelecionada) {
+      const onlyDate = giraSelecionada.data.split("T")[0];
+      setDataEditada(onlyDate);
+      setCapacidadeEditada(String(giraSelecionada.capacidade));
+      setMensagem(null);
+      setErro(null);
+    } else {
+      setDataEditada("");
+      setCapacidadeEditada("");
+    }
+  }, [giraSelecionada]);
 
   // carregar agendados
   useEffect(() => {
@@ -101,8 +123,6 @@ export function AdminPage() {
 
     fetchAgendados();
   }, [giraSelecionadaId]);
-
-  const giraSelecionada = giras.find((g) => g.id === giraSelecionadaId) ?? null;
 
   function exportarCSV() {
     if (!giraSelecionada) return;
@@ -155,6 +175,54 @@ export function AdminPage() {
     } else {
       alert("Código incorreto.");
     }
+  }
+
+  async function handleSalvarConfig(e: FormEvent) {
+    e.preventDefault();
+    if (!giraSelecionada) return;
+
+    setErro(null);
+    setMensagem(null);
+
+    if (!dataEditada) {
+      setErro("Defina uma data para a gira selecionada.");
+      return;
+    }
+
+    const capacidadeNumero = parseInt(capacidadeEditada, 10);
+    if (isNaN(capacidadeNumero) || capacidadeNumero <= 0) {
+      setErro("Defina uma capacidade válida (mínimo 1).");
+      return;
+    }
+
+    setSalvandoConfig(true);
+
+    const { data, error } = await supabase
+      .from("giras")
+      .update({
+        data: dataEditada, // formato YYYY-MM-DD
+        capacidade: capacidadeNumero,
+      })
+      .eq("id", giraSelecionada.id)
+      .select("id, data, titulo, capacidade, tipo")
+      .single();
+
+    if (error) {
+      console.error(error);
+      setErro("Não foi possível salvar as configurações da gira.");
+      setSalvandoConfig(false);
+      return;
+    }
+
+    const giraAtualizada = data as Gira;
+
+    // atualiza lista de giras em memória
+    setGiras((prev) =>
+      prev.map((g) => (g.id === giraAtualizada.id ? giraAtualizada : g))
+    );
+
+    setMensagem("Configurações da gira atualizadas com sucesso.");
+    setSalvandoConfig(false);
   }
 
   // tela de login da equipe, com estética Tuluz
@@ -236,7 +304,8 @@ export function AdminPage() {
         <section className="bg-card rounded-xl shadow-md border border-border/60 p-6 sm:p-8 relative overflow-hidden">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+            {/* seleção de gira + resumo */}
             <div className="flex-1 min-w-[220px]">
               <p className="text-sm font-medium text-muted-foreground mb-2">
                 Selecionar gira
@@ -272,6 +341,7 @@ export function AdminPage() {
               )}
             </div>
 
+            {/* métricas + export */}
             <div className="flex-1 md:max-w-xs space-y-2 text-sm text-muted-foreground">
               <p>
                 Giras cadastradas:{" "}
@@ -285,12 +355,12 @@ export function AdminPage() {
                   </p>
                   <p>
                     Vagas restantes:{" "}
-                      <span className="font-semibold">
-                        {Math.max(
-                          giraSelecionada.capacidade - agendados.length,
-                          0
-                        )}
-                      </span>
+                    <span className="font-semibold">
+                      {Math.max(
+                        giraSelecionada.capacidade - agendados.length,
+                        0
+                      )}
+                    </span>
                   </p>
                 </>
               )}
@@ -304,10 +374,72 @@ export function AdminPage() {
                 Exportar lista em CSV
               </button>
             </div>
+
+            {/* edição da data/capacidade */}
+            {giraSelecionada && (
+              <div className="flex-1 md:max-w-xs mt-4 md:mt-0">
+                <h3 className="text-sm font-semibold mb-3">
+                  Configurações da gira selecionada
+                </h3>
+                <form onSubmit={handleSalvarConfig} className="space-y-3 text-sm">
+                  <div>
+                    <label
+                      className="block text-xs font-medium mb-1"
+                      htmlFor="data-gira-edit"
+                    >
+                      Data da gira
+                    </label>
+                    <input
+                      id="data-gira-edit"
+                      type="date"
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={dataEditada}
+                      onChange={(e) => setDataEditada(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="block text-xs font-medium mb-1"
+                      htmlFor="capacidade-edit"
+                    >
+                      Capacidade (nº de pessoas)
+                    </label>
+                    <input
+                      id="capacidade-edit"
+                      type="number"
+                      min={1}
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={capacidadeEditada}
+                      onChange={(e) => setCapacidadeEditada(e.target.value)}
+                      required
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Este valor é usado para calcular as vagas restantes na tela de
+                      agendamento.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={salvandoConfig}
+                    className="w-full py-2.5 rounded-md bg-emerald-600 text-white font-medium text-sm disabled:opacity-60"
+                  >
+                    {salvandoConfig
+                      ? "Salvando configurações..."
+                      : "Salvar configurações da gira"}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
 
           {erro && (
             <p className="mt-4 text-sm text-red-600">{erro}</p>
+          )}
+          {mensagem && (
+            <p className="mt-2 text-sm text-emerald-600">{mensagem}</p>
           )}
         </section>
 
