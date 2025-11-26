@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { Check } from "lucide-react";
 
 type Gira = {
   id: string;
@@ -23,6 +24,9 @@ export function SchedulingForm() {
 
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  // novo: controle da tela de confirmação
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   // carrega gira ativa + vagas
   useEffect(() => {
@@ -161,6 +165,7 @@ export function SchedulingForm() {
       return;
     }
 
+    // sucesso
     setMensagem("Seu agendamento foi registrado com sucesso para esta gira.");
     setNome("");
     setTelefone("");
@@ -179,8 +184,51 @@ export function SchedulingForm() {
     }
 
     setSubmitting(false);
+    setIsConfirmed(true); // mostra tela de confirmação
   };
 
+  // 🔸 se já confirmou, mostra o card de sucesso no lugar do formulário
+  if (isConfirmed) {
+    return (
+      <section className="relative">
+        <div className="bg-card rounded-xl shadow-md border border-border/60 p-6 sm:p-8 relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
+
+          <div className="flex flex-col items-center text-center py-6 sm:py-8">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+              <Check className="h-9 w-9 text-emerald-600" />
+            </div>
+
+            <h3 className="text-2xl sm:text-3xl font-semibold text-primary mb-3 font-playfair">
+              Agendamento Confirmado
+            </h3>
+
+            <p className="text-sm sm:text-base text-muted-foreground max-w-xl">
+              Seu agendamento no Terreiro de Umbanda Luzeiro Santo foi realizado com
+              sucesso.
+            </p>
+
+            <p className="mt-4 text-base sm:text-lg font-semibold text-emerald-700">
+              Axé e até breve.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsConfirmed(false);
+                setMensagem(null);
+              }}
+              className="mt-8 inline-flex items-center justify-center rounded-md border border-[#cba57c] px-5 py-2.5 text-sm font-medium text-[#9b5a2e] bg-white hover:bg-[#f7efe3] transition-colors"
+            >
+              Fazer novo agendamento
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  // 🔸 tela normal com formulário
   return (
     <section className="relative">
       <div className="bg-card rounded-xl shadow-md border border-border/60 p-6 sm:p-8 relative overflow-hidden">
@@ -210,7 +258,11 @@ export function SchedulingForm() {
               {vagasRestantes !== null && (
                 <p>
                   Vagas restantes:{" "}
-                  <span className={lotado ? "text-red-600 font-semibold" : "font-semibold"}>
+                  <span
+                    className={
+                      lotado ? "text-red-600 font-semibold" : "font-semibold"
+                    }
+                  >
                     {vagasRestantes}
                   </span>
                 </p>
