@@ -8,6 +8,7 @@ type Gira = {
   titulo: string;
   capacidade: number;
   tipo?: string | null;
+  ativa?: boolean | null;
 };
 
 type Agendamento = {
@@ -37,7 +38,16 @@ export function AdminPage() {
   const [capacidadeEditada, setCapacidadeEditada] = useState("");
   const [salvandoConfig, setSalvandoConfig] = useState(false);
 
-  const CODIGO_ADMIN = "terreiro2025";
+  // campos para criar nova gira
+  const [tituloNovo, setTituloNovo] = useState("");
+  const [dataNova, setDataNova] = useState("");
+  const [capacidadeNova, setCapacidadeNova] = useState("");
+  const [tipoNovo, setTipoNovo] = useState("");
+  const [ativaNova, setAtivaNova] = useState(true);
+  const [criandoGira, setCriandoGira] = useState(false);
+
+  // lista de códigos válidos
+  const CODIGOS_ADMIN = ["terreiro2025", "mainha2026", "rompemato"];
 
   function formatarDataBr(isoDate: string) {
     const onlyDate = isoDate.split("T")[0];
@@ -54,7 +64,7 @@ export function AdminPage() {
 
       const { data, error } = await supabase
         .from("giras")
-        .select("id, data, titulo, capacidade, tipo")
+        .select("id, data, titulo, capacidade, tipo, ativa")
         .order("data", { ascending: false });
 
       if (error) {
@@ -169,7 +179,10 @@ export function AdminPage() {
 
   function handleLoginAdmin(e: FormEvent) {
     e.preventDefault();
-    if (codigoDigitado === CODIGO_ADMIN) {
+
+    const codigoLimpo = codigoDigitado.trim();
+
+    if (CODIGOS_ADMIN.includes(codigoLimpo)) {
       setAutorizado(true);
       setCodigoDigitado("");
     } else {
@@ -204,7 +217,7 @@ export function AdminPage() {
         capacidade: capacidadeNumero,
       })
       .eq("id", giraSelecionada.id)
-      .select("id, data, titulo, capacidade, tipo")
+      .select("id, data, titulo, capacidade, tipo, ativa")
       .single();
 
     if (error) {
@@ -223,6 +236,84 @@ export function AdminPage() {
 
     setMensagem("Configurações da gira atualizadas com sucesso.");
     setSalvandoConfig(false);
+  }
+
+  async function handleCriarGira(e: FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    setMensagem(null);
+
+    if (!dataNova) {
+      setErro("Defina a data da nova gira.");
+      return;
+    }
+
+    const capacidadeNumero = parseInt(capacidadeNova, 10);
+    if (isNaN(capacidadeNumero) || capacidadeNumero <= 0) {
+      setErro("Defina uma capacidade válida (mínimo 1).");
+      return;
+    }
+
+    setCriandoGira(true);
+
+    try {
+      // se marcar como ativa, desativar as outras ativas
+      if (ativaNova) {
+        const { error: desativaError } = await supabase
+          .from("giras")
+          .update({ ativa: false })
+          .eq("ativa", true);
+
+        if (desativaError) {
+          console.error(desativaError);
+          setErro("Não foi possível desativar as outras giras ativas.");
+          setCriandoGira(false);
+          return;
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("giras")
+        .insert({
+          titulo: tituloNovo.trim() || "Gira de Domingo",
+          data: dataNova, // YYYY-MM-DD
+          capacidade: capacidadeNumero,
+          tipo: tipoNovo.trim() || null,
+          ativa: ativaNova,
+        })
+        .select("id, data, titulo, capacidade, tipo, ativa")
+        .single();
+
+      if (error) {
+        console.error(error);
+        setErro("Não foi possível criar a nova gira.");
+        setCriandoGira(false);
+        return;
+      }
+
+      const novaGira = data as Gira;
+
+      // adiciona na lista local (mantendo ordem por data desc)
+      setGiras((prev) =>
+        [...prev, novaGira].sort(
+          (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
+        )
+      );
+
+      // seleciona automaticamente a nova gira
+      setGiraSelecionadaId(novaGira.id);
+
+      // limpa formulário
+      setTituloNovo("");
+      setDataNova("");
+      setCapacidadeNova("");
+      setTipoNovo("");
+      setAtivaNova(true);
+
+      setMensagem("Nova gira criada com sucesso.");
+    } finally {
+      setCriandoGira(false);
+    }
   }
 
   // tela de login da equipe, com estética Tuluz
@@ -300,7 +391,7 @@ export function AdminPage() {
           </div>
         </header>
 
-        {/* card de filtros / info da gira */}
+        {/* card de filtros / info da gira + edição */}
         <section className="bg-card rounded-xl shadow-md border border-border/60 p-6 sm:p-8 relative overflow-hidden">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary to-primary/60" />
 
@@ -318,7 +409,8 @@ export function AdminPage() {
                 {giras.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.titulo} — {formatarDataBr(g.data)}{" "}
-                    {g.tipo ? `(${g.tipo})` : ""}
+                    {g.tipo ? `(${g.tipo})` : ""}{" "}
+                    {g.ativa ? "• ativa" : ""}
                   </option>
                 ))}
               </select>
@@ -335,6 +427,12 @@ export function AdminPage() {
                     Capacidade:{" "}
                     <span className="font-medium">
                       {giraSelecionada.capacidade} pessoas
+                    </span>
+                  </p>
+                  <p>
+                    Status:{" "}
+                    <span className="font-medium">
+                      {giraSelecionada.ativa ? "Ativa para agendamento" : "Inativa"}
                     </span>
                   </p>
                 </div>
@@ -441,6 +539,97 @@ export function AdminPage() {
           {mensagem && (
             <p className="mt-2 text-sm text-emerald-600">{mensagem}</p>
           )}
+        </section>
+
+        {/* card para criar nova gira */}
+        <section className="bg-card rounded-xl shadow-md border border-border/60 p-6 sm:p-8">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4">
+            Criar nova gira
+          </h3>
+
+          <form onSubmit={handleCriarGira} className="grid gap-4 md:grid-cols-2 text-sm">
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium mb-1" htmlFor="titulo-novo">
+                Título da gira
+              </label>
+              <input
+                id="titulo-novo"
+                type="text"
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                placeholder="Ex: Gira de Domingo, Gira de Caboclo, etc."
+                value={tituloNovo}
+                onChange={(e) => setTituloNovo(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" htmlFor="data-nova">
+                Data da gira
+              </label>
+              <input
+                id="data-nova"
+                type="date"
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                value={dataNova}
+                onChange={(e) => setDataNova(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" htmlFor="capacidade-nova">
+                Capacidade (nº de pessoas)
+              </label>
+              <input
+                id="capacidade-nova"
+                type="number"
+                min={1}
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                value={capacidadeNova}
+                onChange={(e) => setCapacidadeNova(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" htmlFor="tipo-novo">
+                Tipo (opcional)
+              </label>
+              <input
+                id="tipo-novo"
+                type="text"
+                className="w-full border rounded-md px-3 py-2 text-sm"
+                placeholder="Ex: gira de caboclo, de preto velho..."
+                value={tipoNovo}
+                onChange={(e) => setTipoNovo(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                id="ativa-nova"
+                type="checkbox"
+                checked={ativaNova}
+                onChange={(e) => setAtivaNova(e.target.checked)}
+              />
+              <label
+                className="text-xs font-medium"
+                htmlFor="ativa-nova"
+              >
+                Definir como gira ativa para o público
+              </label>
+            </div>
+
+            <div className="md:col-span-2">
+              <button
+                type="submit"
+                disabled={criandoGira}
+                className="w-full py-2.5 rounded-md bg-primary text-primary-foreground font-medium text-sm disabled:opacity-60"
+              >
+                {criandoGira ? "Criando gira..." : "Criar nova gira"}
+              </button>
+            </div>
+          </form>
         </section>
 
         {/* tabela de agendados */}
