@@ -100,6 +100,7 @@ export function AgendarPage() {
       return;
     }
 
+    // UX: se já está lotado pela contagem, nem tenta
     if (lotado) {
       setErro("As vagas para esta gira já estão esgotadas.");
       return;
@@ -109,6 +110,7 @@ export function AgendarPage() {
 
     const nomeNormalizado = normalizarNome(nome);
 
+    // verificação de duplicidade pelo nome_normalizado
     const { data: duplicados, error: dupError } = await supabase
       .from("agendamentos")
       .select("id")
@@ -143,13 +145,40 @@ export function AgendarPage() {
 
     if (insertError) {
       console.error(insertError);
-      setErro(
-        "Não foi possível concluir seu agendamento. Verifique se já não existe um agendamento em seu nome para esta gira."
-      );
+
+      const msg = (insertError as any).message || "";
+      const details = (insertError as any).details || "";
+
+      // trata especificamente o erro do trigger de capacidade
+      if (
+        msg.includes("Capacidade máxima atingida") ||
+        details.includes("Capacidade máxima atingida")
+      ) {
+        setErro(
+          "As vagas para esta gira já estão esgotadas. Escolha outra data ou aguarde a próxima abertura."
+        );
+
+        // recarrega a contagem real do banco (caso tenha lotado na disputa pela última vaga)
+        const { count, error: countError2 } = await supabase
+          .from("agendamentos")
+          .select("id", { count: "exact", head: true })
+          .eq("gira_id", gira.id);
+
+        if (!countError2) {
+          setVagasUsadas(count ?? 0);
+        }
+
+      } else {
+        setErro(
+          "Não foi possível concluir seu agendamento. Verifique se já não existe um agendamento em seu nome para esta gira ou tente novamente em alguns instantes."
+        );
+      }
+
       setFormLoading(false);
       return;
     }
 
+    // sucesso
     setMensagem("Seu agendamento foi realizado com sucesso para a gira ativa.");
     setNome("");
     setTelefone("");
@@ -157,6 +186,7 @@ export function AgendarPage() {
     setPrimeiraVisita("sim");
     setObservacoes("");
 
+    // atualiza contagem após o insert
     const { count, error: countError } = await supabase
       .from("agendamentos")
       .select("id", { count: "exact", head: true })
