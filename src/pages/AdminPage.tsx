@@ -266,7 +266,9 @@ export function AdminPage() {
 
         if (desativaError) {
           console.error(desativaError);
-          setErro("Não foi possível desativar as outras giras ativas.");
+          setErro(
+            `Erro ao desativar outras giras ativas: ${desativaError.message}`
+          );
           setCriandoGira(false);
           return;
         }
@@ -286,7 +288,7 @@ export function AdminPage() {
 
       if (error) {
         console.error(error);
-        setErro("Não foi possível criar a nova gira.");
+        setErro(`Erro ao criar gira: ${error.message}`);
         setCriandoGira(false);
         return;
       }
@@ -409,8 +411,7 @@ export function AdminPage() {
                 {giras.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.titulo} — {formatarDataBr(g.data)}{" "}
-                    {g.tipo ? `(${g.tipo})` : ""}{" "}
-                    {g.ativa ? "• ativa" : ""}
+                    {g.tipo ? `(${g.tipo})` : ""} {g.ativa ? "• ativa" : ""}
                   </option>
                 ))}
               </select>
