@@ -113,6 +113,11 @@ export function SchedulingForm() {
       return;
     }
 
+    if (!telefone.trim()) {
+      setErro("Por favor, preencha o campo de telefone.");
+      return;
+    }
+
     if (lotado) {
       setErro("As vagas para esta gira já foram preenchidas.");
       return;
@@ -120,26 +125,27 @@ export function SchedulingForm() {
 
     setSubmitting(true);
 
+    const telefoneFinal = telefone.trim();
     const nomeNormalizado = normalizarNome(nome);
 
-    // verifica duplicidade por nome na mesma gira
+    // verifica duplicidade por telefone na mesma gira
     const { data: duplicados, error: dupError } = await supabase
       .from("agendamentos")
       .select("id")
       .eq("gira_id", gira.id)
-      .eq("nome_normalizado", nomeNormalizado)
+      .eq("telefone", telefoneFinal)
       .limit(1);
 
     if (dupError) {
       console.error(dupError);
-      setErro("Não foi possível verificar seu nome. Tente novamente em instantes.");
+      setErro("Não foi possível verificar seu agendamento. Tente novamente em instantes.");
       setSubmitting(false);
       return;
     }
 
     if (duplicados && duplicados.length > 0) {
       setErro(
-        "Já encontramos um agendamento em seu nome para esta gira. Caso precise ajustar algo, por favor fale com a organização."
+        "Já encontramos um agendamento com este telefone para esta gira. Caso precise ajustar algo, por favor fale com a organização."
       );
       setSubmitting(false);
       return;
@@ -152,7 +158,7 @@ export function SchedulingForm() {
       nome_normalizado: nomeNormalizado,
       primeira_visita: primeiraVez === "sim",
       observacoes: observacoes.trim() || null,
-      telefone: telefone.trim() || null,
+      telefone: telefoneFinal,
       email: email.trim() || null,
     });
 
@@ -309,7 +315,7 @@ export function SchedulingForm() {
 
           <div>
             <label className="block text-sm font-medium mb-1" htmlFor="telefone">
-              Telefone / WhatsApp (opcional)
+              Telefone / WhatsApp
             </label>
             <input
               id="telefone"
@@ -319,6 +325,7 @@ export function SchedulingForm() {
               value={telefone}
               onChange={(e) => setTelefone(e.target.value)}
               disabled={loadingGira || lotado || submitting}
+              required
             />
           </div>
 
@@ -345,11 +352,10 @@ export function SchedulingForm() {
               <button
                 type="button"
                 onClick={() => setPrimeiraVez("sim")}
-                className={`w-full rounded-md px-3 py-2 border ${
-                  primeiraVez === "sim"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border"
-                }`}
+                className={`w-full rounded-md px-3 py-2 border ${primeiraVez === "sim"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-foreground border-border"
+                  }`}
                 disabled={loadingGira || lotado || submitting}
               >
                 Sim, é minha primeira vez
@@ -357,11 +363,10 @@ export function SchedulingForm() {
               <button
                 type="button"
                 onClick={() => setPrimeiraVez("nao")}
-                className={`w-full rounded-md px-3 py-2 border ${
-                  primeiraVez === "nao"
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border"
-                }`}
+                className={`w-full rounded-md px-3 py-2 border ${primeiraVez === "nao"
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-foreground border-border"
+                  }`}
                 disabled={loadingGira || lotado || submitting}
               >
                 Não, já frequento o terreiro

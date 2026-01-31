@@ -33,7 +33,7 @@ const Index = () => {
             <div className="sacred-divider max-w-xs mx-auto" />
 
             <p className="text-base sm:text-lg text-primary font-semibold mb-4 leading-relaxed tracking-wide">
-              FÉ, AMOR E CARIDADE
+              LUZ, AMOR E CARIDADE
             </p>
 
             <p className="text-sm sm:text-base text-muted-foreground italic">
