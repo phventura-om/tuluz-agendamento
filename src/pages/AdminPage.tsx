@@ -47,7 +47,7 @@ export function AdminPage() {
   const [criandoGira, setCriandoGira] = useState(false);
 
   // lista de códigos válidos
-  const CODIGOS_ADMIN = ["terreiro2025", "mainha2026", "rompemato"];
+  const CODIGOS_ADMIN = ["terreiro2025", "rompemato", "mainha"];
 
   function formatarDataBr(isoDate: string) {
     const onlyDate = isoDate.split("T")[0];
