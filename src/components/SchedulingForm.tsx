@@ -125,6 +125,7 @@ export function SchedulingForm() {
 
     setSubmitting(true);
 
+    const telefoneFinal = telefone.trim();
     const nomeNormalizado = normalizarNome(nome);
     // Normalização simples para garantir que a busca seja consistente com o que é salvo
     const telefoneFinal = telefone.trim();
