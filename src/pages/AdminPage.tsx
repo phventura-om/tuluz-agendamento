@@ -36,6 +36,7 @@ export function AdminPage() {
 
   const [dataEditada, setDataEditada] = useState("");
   const [capacidadeEditada, setCapacidadeEditada] = useState("");
+  const [ativaEditada, setAtivaEditada] = useState(false);
   const [salvandoConfig, setSalvandoConfig] = useState(false);
 
   // campos para criar nova gira
@@ -95,11 +96,13 @@ export function AdminPage() {
       const onlyDate = giraSelecionada.data.split("T")[0];
       setDataEditada(onlyDate);
       setCapacidadeEditada(String(giraSelecionada.capacidade));
+      setAtivaEditada(!!giraSelecionada.ativa);
       setMensagem(null);
       setErro(null);
     } else {
       setDataEditada("");
       setCapacidadeEditada("");
+      setAtivaEditada(false);
     }
   }, [giraSelecionada]);
 
@@ -210,32 +213,51 @@ export function AdminPage() {
 
     setSalvandoConfig(true);
 
-    const { data, error } = await supabase
-      .from("giras")
-      .update({
-        data: dataEditada, // formato YYYY-MM-DD
-        capacidade: capacidadeNumero,
-      })
-      .eq("id", giraSelecionada.id)
-      .select("id, data, titulo, capacidade, tipo, ativa")
-      .single();
+    try {
+      // se marcou como ativa, desativar as outras ativas
+      if (ativaEditada) {
+        const { error: desativaError } = await supabase
+          .from("giras")
+          .update({ ativa: false })
+          .eq("ativa", true);
 
-    if (error) {
-      console.error(error);
-      setErro("Não foi possível salvar as configurações da gira.");
+        if (desativaError) {
+          console.error(desativaError);
+          setErro(`Erro ao desativar outras giras ativas: ${desativaError.message}`);
+          setSalvandoConfig(false);
+          return;
+        }
+      }
+
+      const { data, error } = await supabase
+        .from("giras")
+        .update({
+          data: dataEditada, // formato YYYY-MM-DD
+          capacidade: capacidadeNumero,
+          ativa: ativaEditada,
+        })
+        .eq("id", giraSelecionada.id)
+        .select("id, data, titulo, capacidade, tipo, ativa")
+        .single();
+
+      if (error) {
+        console.error(error);
+        setErro("Não foi possível salvar as configurações da gira.");
+        setSalvandoConfig(false);
+        return;
+      }
+
+      const giraAtualizada = data as Gira;
+
+      // atualiza lista de giras em memória
+      setGiras((prev) =>
+        prev.map((g) => (g.id === giraAtualizada.id ? giraAtualizada : g))
+      );
+
+      setMensagem("Configurações da gira atualizadas com sucesso.");
+    } finally {
       setSalvandoConfig(false);
-      return;
     }
-
-    const giraAtualizada = data as Gira;
-
-    // atualiza lista de giras em memória
-    setGiras((prev) =>
-      prev.map((g) => (g.id === giraAtualizada.id ? giraAtualizada : g))
-    );
-
-    setMensagem("Configurações da gira atualizadas com sucesso.");
-    setSalvandoConfig(false);
   }
 
   async function handleCriarGira(e: FormEvent) {
@@ -518,6 +540,18 @@ export function AdminPage() {
                       Este valor é usado para calcular as vagas restantes na tela de
                       agendamento.
                     </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 py-1">
+                    <input
+                      id="ativa-edit"
+                      type="checkbox"
+                      checked={ativaEditada}
+                      onChange={(e) => setAtivaEditada(e.target.checked)}
+                    />
+                    <label className="text-xs font-medium" htmlFor="ativa-edit">
+                      Gira ativa para o público
+                    </label>
                   </div>
 
                   <button
