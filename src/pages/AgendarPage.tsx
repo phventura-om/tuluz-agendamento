@@ -70,6 +70,22 @@ export function AgendarPage() {
     };
 
     fetchData();
+
+    // Inscrição em tempo real para mudanças na tabela de giras
+    const channel = supabase
+      .channel("giras-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "giras" },
+        () => {
+          fetchData(); // Recarrega os dados quando qualquer gira mudar
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const capacidade = gira?.capacidade ?? 0;

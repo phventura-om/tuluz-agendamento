@@ -76,6 +76,22 @@ export function SchedulingForm() {
     };
 
     carregarDados();
+
+    // Inscrição em tempo real para mudanças na tabela de giras
+    const channel = supabase
+      .channel("giras-form-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "giras" },
+        () => {
+          carregarDados(); // Recarrega os dados quando qualquer gira mudar
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const capacidade = gira?.capacidade ?? 0;
