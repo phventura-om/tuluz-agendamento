@@ -125,6 +125,19 @@ export function SchedulingForm() {
 
     setSubmitting(true);
 
+    // Re-checa se a gira ainda está ativa no banco antes de prosseguir
+    const { data: giraAtual, error: checkError } = await supabase
+      .from("giras")
+      .select("ativa")
+      .eq("id", gira.id)
+      .single();
+
+    if (checkError || !giraAtual?.ativa) {
+      setErro("Esta gira não está mais disponível para agendamento.");
+      setSubmitting(false);
+      return;
+    }
+
     const telefoneFinal = telefone.trim();
     const nomeNormalizado = normalizarNome(nome);
     // Normalização simples para garantir que a busca seja consistente com o que é salvo
